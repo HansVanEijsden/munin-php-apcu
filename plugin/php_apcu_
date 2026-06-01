@@ -1,13 +1,11 @@
 #!/bin/bash
 # Munin plugin voor PHP APCu stats - per container
-# Versie: 1.0.0
+# Versie: 1.0.1 - Geen PHP CLI nodig
 
 PLUGIN_NAME="${0##*/}"
 CONTAINER="${PLUGIN_NAME#php_apcu_}"
-CONTAINER="${CONTAINER//_/-}"  # Zet underscores terug naar streepjes
+CONTAINER="${CONTAINER//_/-}"
 SOCKET="/run/php/${CONTAINER}.sock"
-
-# Veilige naam voor Munin (streepjes -> underscores)
 SAFE_NAME="${CONTAINER//-/_}"
 
 get_apcu_stats() {
@@ -54,21 +52,32 @@ EOF
 do_values() {
     local json=$(get_apcu_stats)
     
-    echo "$json" | php -r '
-        $data = json_decode(file_get_contents("php://stdin"), true);
-        if (!$data || !isset($data["seg_size"])) {
-            echo "used.value U\nfree.value U\ntotal.value U\n";
-            exit(1);
-        }
+    # Parse JSON met jq (als beschikbaar)
+    if command -v jq >/dev/null 2>&1; then
+        local total=$(echo "$json" | jq -r '.seg_size // 0')
+        local free=$(echo "$json" | jq -r '.avail_mem // 0')
+        local used=$((total - free))
         
-        $total = $data["seg_size"];
-        $free = $data["avail_mem"];
-        $used = $total - $free;
+        echo "used.value $used"
+        echo "free.value $free"
+        echo "total.value $total"
+    else
+        # Fallback naar grep/sed als jq niet beschikbaar is
+        local total=$(echo "$json" | grep -o '"seg_size":[0-9]*' | cut -d':' -f2)
+        local free=$(echo "$json" | grep -o '"avail_mem":[0-9]*' | cut -d':' -f2)
         
-        echo "used.value " . $used . "\n";
-        echo "free.value " . $free . "\n";
-        echo "total.value " . $total . "\n";
-    '
+        if [ -z "$total" ]; then
+            total=0
+        fi
+        if [ -z "$free" ]; then
+            free=0
+        fi
+        local used=$((total - free))
+        
+        echo "used.value $used"
+        echo "free.value $free"
+        echo "total.value $total"
+    fi
 }
 
 # Main logic

@@ -26,6 +26,12 @@ if ! command -v cgi-fcgi >/dev/null 2>&1; then
     exit 1
 fi
 
+# Optional: check jq (not required, but nice to have)
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Warning: jq not found. Will use grep/sed fallback for JSON parsing."
+    echo "Install jq for better performance: apt-get install jq"
+fi
+
 # Copy plugin to Munin directory
 cp "$PLUGIN_SOURCE" "$MUNIN_PLUGIN_DIR/"
 chmod +x "${MUNIN_PLUGIN_DIR}/php_apcu_"
