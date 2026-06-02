@@ -1,6 +1,6 @@
 #!/bin/bash
 # Munin plugin voor PHP APCu stats - per container
-# Versie: 1.0.1 - Geen PHP CLI nodig
+# Versie: 1.0.3 - Geen warnings (APCu managed cache)
 
 PLUGIN_NAME="${0##*/}"
 CONTAINER="${PLUGIN_NAME#php_apcu_}"
@@ -21,7 +21,7 @@ graph_title PHP APCu memory usage - ${CONTAINER}
 graph_args --base 1024 -l 0
 graph_vlabel bytes
 graph_category php-apcu
-graph_info APCu memory usage for ${CONTAINER}. Shows when memory is nearly full (free memory near 0).
+graph_info APCu memory usage for ${CONTAINER}. APCu manages its own cache and will evict old entries when needed.
 graph_order used free total
 
 used.label Used memory
@@ -36,9 +36,7 @@ free.type GAUGE
 free.min 0
 free.draw STACK
 free.colour 6BAED6
-free.warning 10485760:
-free.critical 5242880:
-free.info Available APCu memory (warning if below 10MB, critical if below 5MB)
+free.info Available APCu memory (no warnings - APCu manages cache automatically)
 
 total.label Total memory
 total.type GAUGE
