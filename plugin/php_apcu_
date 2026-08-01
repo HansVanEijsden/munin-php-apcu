@@ -1,6 +1,6 @@
 #!/bin/bash
-# Munin plugin voor PHP APCu stats - per container
-# Versie: 1.0.3 - Geen warnings (APCu managed cache)
+# Munin plugin for PHP APCu stats - per container
+# Version: 1.0.3 - No warnings (APCu manages its own cache)
 
 PLUGIN_NAME="${0##*/}"
 CONTAINER="${PLUGIN_NAME#php_apcu_}"
@@ -50,7 +50,7 @@ EOF
 do_values() {
     local json=$(get_apcu_stats)
     
-    # Parse JSON met jq (als beschikbaar)
+    # Parse JSON with jq (if available)
     if command -v jq >/dev/null 2>&1; then
         local total=$(echo "$json" | jq -r '.seg_size // 0')
         local free=$(echo "$json" | jq -r '.avail_mem // 0')
@@ -60,7 +60,7 @@ do_values() {
         echo "free.value $free"
         echo "total.value $total"
     else
-        # Fallback naar grep/sed als jq niet beschikbaar is
+        # Fallback to grep/sed if jq is not available
         local total=$(echo "$json" | grep -o '"seg_size":[0-9]*' | cut -d':' -f2)
         local free=$(echo "$json" | grep -o '"avail_mem":[0-9]*' | cut -d':' -f2)
         

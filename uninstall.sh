@@ -1,5 +1,5 @@
 #!/bin/bash
-# Uninstall script voor Munin PHP APCu plugin
+# Uninstall script for Munin PHP APCu plugin
 
 set -e
 

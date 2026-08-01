@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installatie script voor Munin PHP APCu plugin
+# Installation script for Munin PHP APCu plugin
 
 set -e
 
