@@ -1,0 +1,110 @@
+#!/bin/bash
+# Munin plugin for PHP APCu stats - ALL containers in a single process (multigraph)
+# Version: 2.0.0 - single-process auto-discovering replacement for the
+# per-container php_apcu_<container> wildcard plugin.
+#
+# Emits one multigraph per container: php_apcu_memory_<safe_name>
+# (identical graph names to v1.x, so existing RRDs are preserved).
+#
+# Why this exists: v1.x spawned one plugin process per container, each doing
+# its own `docker ps` + `cgi-fcgi` + `jq`. With ~30 containers that meant
+# ~130 subprocess spawns and ~30 PHP-FPM socket hits every poll. This version
+# does a single `docker ps`, one `cgi-fcgi` per container socket and minimal
+# JSON parsing, cutting Munin's CPU/process/IO load dramatically.
+
+PLUGIN_NAME="${0##*/}"
+
+get_apcu_stats() {
+    local container="$1"
+    SCRIPT_NAME=/tmp/apcu-status.php \
+    SCRIPT_FILENAME=/tmp/apcu-status.php \
+    REQUEST_METHOD=GET \
+    cgi-fcgi -bind -connect "/run/php/${container}.sock" 2>&1 | tail -1
+}
+
+# Container name -> Munin-safe name (dashes -> underscores)
+safe() { echo "${1//-/_}"; }
+
+# Discover running containers that expose a PHP-FPM FastCGI socket
+php_containers() {
+    local c
+    for c in $(docker ps --format '{{.Names}}' 2>/dev/null); do
+        if [ -S "/run/php/${c}.sock" ]; then
+            echo "$c"
+        fi
+    done
+}
+
+do_memory_config() {
+    local container="$1"
+    local safe_name
+    safe_name=$(safe "$container")
+    cat <<EOF
+multigraph php_apcu_memory_${safe_name}
+graph_title PHP APCu memory usage - ${container}
+graph_args --base 1024 -l 0
+graph_vlabel bytes
+graph_category php-apcu
+graph_info APCu memory usage for ${container}. APCu manages its own cache and will evict old entries when needed.
+graph_order used free total
+
+used.label Used memory
+used.type GAUGE
+used.min 0
+used.draw AREA
+used.colour 44AD4E
+used.info Currently used APCu memory (seg_size - avail_mem)
+
+free.label Free memory
+free.type GAUGE
+free.min 0
+free.draw STACK
+free.colour 6BAED6
+free.info Available APCu memory (no warnings - APCu manages cache automatically)
+
+total.label Total memory
+total.type GAUGE
+total.min 0
+total.draw LINE2
+total.colour 999999
+total.info Total APCu memory available (seg_size)
+EOF
+}
+
+do_memory_values() {
+    local container="$1"
+    local safe_name json total free used
+    safe_name=$(safe "$container")
+    json=$(get_apcu_stats "$container")
+
+    if command -v jq >/dev/null 2>&1; then
+        total=$(echo "$json" | jq -r '.seg_size // 0')
+        free=$(echo "$json" | jq -r '.avail_mem // 0')
+    else
+        total=$(echo "$json" | grep -o '"seg_size":[0-9]*' | cut -d':' -f2)
+        free=$(echo "$json" | grep -o '"avail_mem":[0-9]*' | cut -d':' -f2)
+        [ -z "$total" ] && total=0
+        [ -z "$free" ] && free=0
+    fi
+    used=$((total - free))
+
+    echo "multigraph php_apcu_memory_${safe_name}"
+    echo "used.value $used"
+    echo "free.value $free"
+    echo "total.value $total"
+}
+
+case "$1" in
+    config)
+        for c in $(php_containers); do
+            do_memory_config "$c"
+            echo
+        done
+        ;;
+    *)
+        for c in $(php_containers); do
+            do_memory_values "$c"
+            echo
+        done
+        ;;
+esac

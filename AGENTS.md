@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`munin-php-apcu` is a Munin plugin that monitors APCu memory statistics per PHP Docker container. The core is a single Bash script (`plugin/php_apcu_`) installed on a Munin node. It reads APCu stats from a per-container FastCGI socket exposed by a custom PHP Docker image.
+`munin-php-apcu` is a Munin plugin that monitors APCu memory statistics per PHP Docker container. The core is a single Bash script (`plugin/php_apcu_multi`) installed on a Munin node. It reads APCu stats from per-container FastCGI sockets exposed by a custom PHP Docker image, auto-discovering all containers on every poll.
 
 Full install instructions live in [README.md](README.md) — link there for deployment details instead of duplicating them here.
 
@@ -16,15 +16,16 @@ make update        # git pull origin main && sudo bash install.sh
 make clean         # git clean -fdX
 ```
 
-- `install.sh` copies `plugin/php_apcu_` to `/usr/share/munin/plugins/`, then symlinks it as `/etc/munin/plugins/php_apcu_<container>` for each running container whose name ends in `php`.
-- Test with: `sudo munin-run php_apcu_<container> config` / `sudo munin-run php_apcu_<container>`.
+- `install.sh` copies `plugin/php_apcu_multi` to `/usr/share/munin/plugins/` and symlinks it as `/etc/munin/plugins/php_apcu_multi` (removing any legacy per-container `php_apcu_*` symlinks). Containers are auto-discovered at every poll.
+- Test with: `sudo munin-run php_apcu_multi config` / `sudo munin-run php_apcu_multi`.
 
 ## How the plugin works
 
-- The plugin is symlinked once per container; it derives the container name from its own basename: `${0##*/}` → strip `php_apcu_` prefix → replace `_` with `-` (matches real container names).
-- Container names with dashes are converted back to underscores (`SAFE_NAME`) for the multigraph name.
-- Stats are fetched via `cgi-fcgi` from socket `/run/php/${CONTAINER}.sock`, using `jq` when available and a `grep`/`sed` fallback otherwise.
-- Emits Munin multigraph `php_apcu_memory_${SAFE_NAME}` with `used`/`free`/`total` fields in graph category `php-apcu`.
+- On every poll the plugin lists running containers once (`docker ps`) and keeps those exposing a FastCGI socket at `/run/php/<container>.sock`.
+- Container names with dashes are converted to underscores (`SAFE_NAME`) for the multigraph name.
+- Stats are fetched via `cgi-fcgi` from each socket, using `jq` when available and a `grep`/`sed` fallback otherwise.
+- Emits one Munin multigraph per container, `php_apcu_memory_${SAFE_NAME}` with `used`/`free`/`total` fields in graph category `php-apcu`.
+- Graph names are byte-for-byte identical to v1.x, so existing RRDs survive an upgrade.
 
 ## Conventions & pitfalls
 
@@ -34,4 +35,5 @@ make clean         # git clean -fdX
 - **No warning/critical thresholds by design** (v1.0.3): APCu manages its own cache and evicts entries automatically, so memory warnings were deliberately removed. Do not re-add them.
 - Version comments in the plugin header should be bumped on behavior changes.
 - Keep comments and user-facing strings in English — the project was fully translated from Dutch so it is accessible to a global audience.
-- Do not rename `plugin/php_apcu_` (the trailing underscore is part of the symlink convention).
+- Do not rename `plugin/php_apcu_multi` — `install.sh` and the README reference it.
+- The multi plugin silently skips containers that are stopped or lack a socket. If no containers match, it outputs nothing — only install it on hosts that run the custom PHP image.

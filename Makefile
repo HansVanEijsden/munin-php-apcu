@@ -11,13 +11,9 @@ update:
 	sudo bash install.sh
 
 test:
-	@echo "Testing APCu plugin..."
-	@for container in $$(docker ps --format "{{.Names}}" | grep -E 'php$$'); do \
-		echo "=== APCu - $$container ==="; \
-		sudo munin-run php_apcu_$$container config | head -5; \
-		sudo munin-run php_apcu_$$container; \
-		echo ""; \
-	done
+	@echo "Testing APCu multi plugin..."
+	@sudo munin-run php_apcu_multi config | head -10
+	@sudo munin-run php_apcu_multi
 
 clean:
 	git clean -fdX
