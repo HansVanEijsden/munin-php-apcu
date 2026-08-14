@@ -19,7 +19,7 @@ containers.
 - Automatic container detection (any container exposing `/run/php/<name>.sock`)
 - Single process for all containers (v2.0.0) — one `docker ps`, one FastCGI query per container
 - No manual thresholds — APCu manages its own cache and evicts entries automatically, so no warning/critical levels are configured (v1.0.3+)
-- Pure Bash: `jq` is used when available, with a `grep`/`sed` fallback otherwise
+- Pure Bash: `jq` is used when available, with a `grep`/`cut` fallback otherwise
 
 ## Requirements
 

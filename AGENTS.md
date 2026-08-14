@@ -9,7 +9,7 @@ Full install instructions live in [README.md](README.md) — link there for depl
 ## Key commands
 
 ```bash
-make test          # run plugin against all running php-* containers (config + values)
+make test          # run plugin config + values against all auto-discovered containers
 make install       # sudo bash install.sh
 make uninstall     # sudo bash uninstall.sh
 make update        # git pull origin main && sudo bash install.sh
@@ -23,14 +23,14 @@ make clean         # git clean -fdX
 
 - On every poll the plugin lists running containers once (`docker ps`) and keeps those exposing a FastCGI socket at `/run/php/<container>.sock`.
 - Container names with dashes are converted to underscores (`SAFE_NAME`) for the multigraph name.
-- Stats are fetched via `cgi-fcgi` from each socket, using `jq` when available and a `grep`/`sed` fallback otherwise.
+- Stats are fetched via `cgi-fcgi` from each socket, using `jq` when available and a `grep`/`cut` fallback otherwise.
 - Emits one Munin multigraph per container, `php_apcu_memory_${SAFE_NAME}` with `used`/`free`/`total` fields in graph category `php-apcu`.
 - Graph names are byte-for-byte identical to v1.x, so existing RRDs survive an upgrade.
 
 ## Conventions & pitfalls
 
 - All scripts are `#!/bin/bash`; install/uninstall/update use `set -e` (do not remove it).
-- `jq` is optional — the plugin must keep working without it via the grep/sed fallback. If you touch JSON parsing, update both paths.
+- `jq` is optional — the plugin must keep working without it via the grep/cut fallback. If you touch JSON parsing, update both paths.
 - The plugin assumes the munin user can run `docker` (typically via the `docker` group). It also requires `cgi-fcgi` (`apt-get install libfcgi0ldbl`).
 - **No warning/critical thresholds by design** (v1.0.3): APCu manages its own cache and evicts entries automatically, so memory warnings were deliberately removed. Do not re-add them.
 - Version comments in the plugin header should be bumped on behavior changes.

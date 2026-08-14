@@ -60,7 +60,7 @@ do_values() {
         echo "free.value $free"
         echo "total.value $total"
     else
-        # Fallback to grep/sed if jq is not available
+        # Fallback to grep/cut if jq is not available
         local total=$(echo "$json" | grep -o '"seg_size":[0-9]*' | cut -d':' -f2)
         local free=$(echo "$json" | grep -o '"avail_mem":[0-9]*' | cut -d':' -f2)
         
